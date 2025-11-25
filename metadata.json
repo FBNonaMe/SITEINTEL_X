@@ -1,0 +1,5 @@
+{
+  "name": "SiteIntel AI Scanner",
+  "description": "A comprehensive website analysis tool powered by Gemini. Scans for public metadata, SEO reputation, and technology stack information using AI-driven search grounding.",
+  "requestFramePermissions": []
+}
