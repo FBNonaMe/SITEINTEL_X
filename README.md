@@ -1,20 +1,59 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# SITEINTEL_X — Интерфейс
 
-# Run and deploy your AI Studio app
+SITEINTEL_X — автоматизированный комплекс для red teaming и разведки (reconnaissance), объединяющий AI‑модели с классическими инструментами сканирования. Интерфейс выполнен в тёмной теме с фиолетовыми и лазурными акцентами.
 
-This contains everything you need to run your app locally.
+## Главный экран
 
-View your app in AI Studio: https://ai.studio/apps/drive/1Nq-S5ddt6Z-Ejieev7by3ibLGCTp3LzC
+В верхней части интерфейса размещены:
 
-## Run Locally
+* **Логотип SITEINTEL_X**.
+* **Подзаголовок:**
+  *Automated Red Teaming & Reconnaissance Suite. Simulate Nuclei, Nmap, and Shodan vectors via AI inference.*
 
-**Prerequisites:**  Node.js
+## Панель сканирования
 
+Центральный блок отвечает за запуск анализа цели.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### Переключатели режимов
+
+* **Passive Scan**
+* **Aggressive Mode**
+
+### Основные элементы
+
+* Поле ввода целевого URL.
+* Кнопка **Attack** для старта анализа.
+
+Компоненты содержат интерактивную подсветку состояния выбранного режима.
+
+## Вкладки навигации
+
+Под панелью сканирования расположены вкладки:
+
+* **Overview**
+* **Reconnaissance** *(активная)**
+* **Vulnerabilities**
+* **Configuration**
+
+Каждая вкладка открывает отдельный аналитический модуль.
+
+## Модуль Reconnaissance — результаты
+
+Интерфейс содержит набор виджетов, отображающих разведданные.
+
+### 1. Subdomain Enumeration
+
+Отображает найденные субдомены.
+
+Пример:
+
+* *No subdomains discovered in public index.*
+
+### 2. Port Scan & Services
+
+Карточка отображает состояние обнаруженных портов:
+
+| Port | Service          | Status |
+| ---- | ---------------- | ------ |
+| 80   | HTTP (inferred)  | OPEN   |
+| 443  | HTTPS (inferred) | OPEN   |
