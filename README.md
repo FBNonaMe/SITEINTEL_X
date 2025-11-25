@@ -69,7 +69,7 @@ Found a CVE? SiteIntel-X writes the code for you.
 
 ```bash
 # Clone the repository
-git clone https://github.com/FBNonaMe/SITEINTEL_X
+git clone https://github.com/your-username/siteintel-x.git
 
 # Enter the war room
 cd siteintel-x
@@ -98,5 +98,5 @@ Using this tool against targets without prior mutual consent is illegal. The dev
 ---
 
 <div align="center">
-  <sub> FBNonaMe</sub>
+  <sub>POWERED BY GEMINI OFFENSIVE INTELLIGENCE</sub>
 </div>
