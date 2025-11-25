@@ -82,7 +82,7 @@ npm install
 # API_KEY=your_gemini_api_key_here
 
 # Launch
-$ npm run dev
+npm start
 ```
 
 ---
@@ -98,5 +98,5 @@ Using this tool against targets without prior mutual consent is illegal. The dev
 ---
 
 <div align="center">
-  <sub>POWERED BY Dark OFFENSIVE INTELLIGENCE</sub>
+  <sub>POWERED BY GEMINI OFFENSIVE INTELLIGENCE</sub>
 </div>

@@ -4,6 +4,8 @@ export interface Vulnerability {
   name: string;
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
   description: string;
+  mitreId?: string; // e.g. T1190
+  mitreTactic?: string; // e.g. Initial Access
   location?: string; // URL or path
   evidence?: string;
 }
@@ -55,6 +57,16 @@ export interface CredentialIntel {
   }[];
   potentialUsernames: string[]; // e.g. "admin", "root", "jsmith"
   passwordWordlist: string[]; // Generated wordlist based on domain/year
+}
+
+export interface WafIntel {
+  detected: boolean;
+  name: string; // Cloudflare, AWS WAF, Akamai
+  bypassTechniques: {
+    method: string; // e.g. "Header Tampering"
+    payload: string; // e.g. "X-Originating-IP: 127.0.0.1"
+    description: string;
+  }[];
 }
 
 export interface SubdomainTakeover {
@@ -236,6 +248,13 @@ export interface PickleFlaw {
   description: string;
 }
 
+export interface CloudConfigFinding {
+  type: 'AWS S3' | 'Azure Blob' | 'GCP Bucket' | 'Config File' | 'Exposed File';
+  url: string;
+  risk: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'INFO';
+  description: string;
+}
+
 export interface SiteAnalysisData {
   summary: string;
   targetIp?: string;
@@ -247,7 +266,7 @@ export interface SiteAnalysisData {
   subdomains: string[];
   hiddenDirectories: string[];
   openPorts: ServicePort[];
-  wafDetected?: string[]; 
+  wafIntel: WafIntel; 
   
   // Passive Deep OSINT
   mailSecurity?: {
@@ -294,10 +313,9 @@ export interface SiteAnalysisData {
   
   // Specific Scans
   apiSecurity: (string | RichFinding)[];
-  // Added to fix TS error in geminiService
   rateLimiting?: (string | RichFinding)[];
   apiEndpoints?: (string | RichFinding)[]; 
-  cloudConfig: (string | RichFinding)[]; 
+  cloudConfig: CloudConfigFinding[]; 
   
   // GraphQL Security
   graphql: boolean;
