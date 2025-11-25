@@ -1,59 +1,102 @@
-# SITEINTEL_X — Интерфейс
+# 💀 SiteIntel-X: AI Offensive Intelligence Suite
 
-SITEINTEL_X — автоматизированный комплекс для red teaming и разведки (reconnaissance), объединяющий AI‑модели с классическими инструментами сканирования. Интерфейс выполнен в тёмной теме с фиолетовыми и лазурными акцентами.
+![License](https://img.shields.io/badge/License-MIT-red.svg)
+![Status](https://img.shields.io/badge/Status-WEAPONIZED-red)
+![AI](https://img.shields.io/badge/AI-Gemini%202.5-cyan)
+![Type](https://img.shields.io/badge/Type-Red%20Teaming-purple)
 
-## Главный экран
+> **"The only secure system is one that is powered off."**
 
-В верхней части интерфейса размещены:
+**SiteIntel-X** is a next-generation **Automated Red Teaming & Reconnaissance Platform**. It leverages **Google Gemini's** advanced reasoning to simulate complex cyber-attack chains, perform deep OSINT, and generate weaponized exploits in real-time.
 
-* **Логотип SITEINTEL_X**.
-* **Подзаголовок:**
-  *Automated Red Teaming & Reconnaissance Suite. Simulate Nuclei, Nmap, and Shodan vectors via AI inference.*
+Unlike traditional scanners that rely on static signatures, SiteIntel-X *infers* vulnerabilities based on architectural patterns, context, and leaked metadata.
 
-## Панель сканирования
+---
 
-Центральный блок отвечает за запуск анализа цели.
+## ⚡ Capabilities
 
-### Переключатели режимов
+### 👁️ PASSIVE_MODE (Ghost Protocol)
+*The silent stalker. Gathers intelligence without triggering IDS/IPS.*
 
-* **Passive Scan**
-* **Aggressive Mode**
+*   **Deep OSINT**: Scrapes LinkedIn and social footprints to identify key technical staff (Social Engineering targets).
+*   **Mail Security Audit**: Analyzes SPF/DMARC records to determine if the domain is vulnerable to **Email Spoofing**.
+*   **Archive Archaeology**: Digs through the **Wayback Machine** to find deprecated API endpoints (`/v1`, `/admin_old`) and forgotten backups.
+*   **Leak Hunter**: Scours the Dark Web and breach databases for compromised credentials associated with the domain.
+*   **Metadata Extraction**: Uses Google Dorks to find publicly indexed sensitive documents (PDF, XLS, DOCX, CONF).
 
-### Основные элементы
+### 💥 AGGRESSIVE_MODE (Assault Protocol)
+*The battering ram. Active engagement and exploitation simulation.*
 
-* Поле ввода целевого URL.
-* Кнопка **Attack** для старта анализа.
+*   **Nuclei & Nmap Simulation**: Infers open ports, services, and maps the technology stack to specific **CVEs**.
+*   **Cloud Raider**: Scans **AWS S3, Azure Blob, and GCP Storage** for exposed buckets and configuration files (`.env`, `terraform.tfstate`).
+*   **Subdomain Takeover**: Identifies dangling CNAME records pointing to unclaimed third-party services (critical risk).
+*   **Credential Access**:
+    *   **Panel Enum**: Locates admin interfaces (`/wp-admin`, `/manager`).
+    *   **Default Creds**: Suggests default logins based on the stack (e.g., `tomcat:s3cret`).
+    *   **Password Spray**: Generates a custom brute-force wordlist based on the target's profile.
+*   **Path Traversal / LFI**: Hunts for file inclusion parameters to read system files (`/etc/passwd`).
+*   **API & GraphQL**: Checks for Introspection, BOLA, and IDOR vulnerabilities.
+*   **Client-Side SAST**: Scans JavaScript bundles for hardcoded API keys (Stripe, AWS) and dangerous DOM sinks (`eval()`).
 
-Компоненты содержат интерактивную подсветку состояния выбранного режима.
+---
 
-## Вкладки навигации
+## 🛠️ The Arsenal
 
-Под панелью сканирования расположены вкладки:
+### 💉 The Weaponizer (Auto-Exploit)
+Found a CVE? SiteIntel-X writes the code for you.
+*   **Context-Aware**: Generates Python 3 `requests` scripts tailored to the target's specific tech stack.
+*   **Safe Verification**: Creates Proof-of-Concept (PoC) payloads (e.g., `whoami`, `version()`) to verify flaws without destroying the server.
 
-* **Overview**
-* **Reconnaissance** *(активная)**
-* **Vulnerabilities**
-* **Configuration**
+### 🎣 Phishing Lure Generator
+*   Auto-generates convincing "Security Update" email templates based on the detected software versions to trick admins into handing over credentials.
 
-Каждая вкладка открывает отдельный аналитический модуль.
+### 📊 Cyberpunk Dashboard
+*   **Recon Tab**: Subdomains, Ports, Hidden Dirs.
+*   **Vulns Tab**: CVEs, Weaponized URLs (SQLi/XSS).
+*   **Intel Tab**: Emails, WAF Detect, Credential Access.
+*   **Infra Tab**: Geolocation, Whois, Leaks.
+*   **Client Tab**: DOM XSS, Subdomain Takeover.
 
-## Модуль Reconnaissance — результаты
+---
 
-Интерфейс содержит набор виджетов, отображающих разведданные.
+## 🚀 Installation & Usage
 
-### 1. Subdomain Enumeration
+### Prerequisites
+*   Node.js & npm
+*   Google Gemini API Key (Paid Tier recommended for high throughput)
 
-Отображает найденные субдомены.
+### Setup
 
-Пример:
+```bash
+# Clone the repository
+git clone https://github.com/FBNonaMe/SITEINTEL_X
 
-* *No subdomains discovered in public index.*
+# Enter the war room
+cd siteintel-x
 
-### 2. Port Scan & Services
+# Install dependencies
+npm install
 
-Карточка отображает состояние обнаруженных портов:
+# Set your warhead (API Key)
+# Create a .env file and add:
+# API_KEY=your_gemini_api_key_here
 
-| Port | Service          | Status |
-| ---- | ---------------- | ------ |
-| 80   | HTTP (inferred)  | OPEN   |
-| 443  | HTTPS (inferred) | OPEN   |
+# Launch
+npm start
+```
+
+---
+
+## ⚠️ Disclaimer
+
+**SiteIntel-X is designed for AUTHORIZED security audits and educational purposes only.**
+
+Using this tool against targets without prior mutual consent is illegal. The developer accepts no responsibility for any damage caused by the misuse of this software.
+
+*Scan responsibly. Or don't. I'm code, not a cop.* 😈
+
+---
+
+<div align="center">
+  <sub>POWERED BY GEMINI OFFENSIVE INTELLIGENCE</sub>
+</div>
