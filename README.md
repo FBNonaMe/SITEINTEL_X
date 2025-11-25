@@ -98,5 +98,5 @@ Using this tool against targets without prior mutual consent is illegal. The dev
 ---
 
 <div align="center">
-  <sub>POWERED BY GEMINI OFFENSIVE INTELLIGENCE</sub>
+  <sub> FBNonaMe</sub>
 </div>
