@@ -145,20 +145,60 @@ const ResultDashboard: React.FC<ResultDashboardProps> = ({ data }) => {
                             const isSensitive = /\.(env|pem|key|yml|yaml|conf|config|log|sqlite|bak|sql|json)$/i.test(docStr);
                             return (
                                 <div key={idx} className={`p-2 border rounded text-sm font-mono flex items-center justify-between group transition-colors ${isSensitive ? 'bg-red-900/30 border-red-500 text-red-200 shadow-[0_0_10px_rgba(220,38,38,0.1)]' : 'bg-slate-900/50 border-slate-700 text-cyan-300 hover:border-cyan-500/50'}`}>
-                                    <div className="flex items-center gap-2 truncate w-full">
+                                    <div className="flex items-center gap-2 truncate flex-grow min-w-0 mr-2">
                                         {isSensitive ? <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" /> : <File className="w-3 h-3 text-slate-500 shrink-0" />}
-                                        <span className="truncate">{renderFinding(doc)}</span>
+                                        <div className="truncate w-full">{renderFinding(doc)}</div>
                                     </div>
-                                    {isSensitive && <span className="text-[10px] bg-red-950 text-red-400 px-1.5 py-0.5 rounded border border-red-900 uppercase font-bold">Sensitive</span>}
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        {isSensitive && <span className="text-[10px] bg-red-950 text-red-400 px-1.5 py-0.5 rounded border border-red-900 uppercase font-bold">Sensitive</span>}
+                                        {docStr && (
+                                            <a href={docStr} target="_blank" rel="noopener noreferrer" className={`p-1.5 rounded transition-colors ${isSensitive ? 'bg-red-900/50 hover:bg-red-800 text-white border border-red-500/50' : 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-cyan-400 border border-slate-600'}`} title="Download / View">
+                                                <Download className="w-3 h-3" />
+                                            </a>
+                                        )}
+                                    </div>
                                 </div>
                             );
                         }) : <div className="text-slate-500 italic text-sm">No public documents found.</div>}
                     </div>
                  </div>
                  <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 backdrop-blur-sm">
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><History className="text-yellow-400 w-5 h-5" /> Wayback Archive Findings</h3>
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Save className="text-red-400 w-5 h-5" /> Backup & Source Leaks</h3>
                     <div className="max-h-64 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
-                        {data.archiveEndpoints?.length ? data.archiveEndpoints.map((path, idx) => (<div key={idx} className="p-2 bg-slate-900/50 border border-slate-700 rounded text-sm text-yellow-300 font-mono break-all">{renderFinding(path)}</div>)) : <div className="text-slate-500 italic text-sm">No interesting history found.</div>}
+                        {/* Git Exposures */}
+                        {data.gitExposures?.map((git, idx) => (
+                            <div key={`git-${idx}`} className="p-2 bg-red-900/10 border border-red-500/30 rounded text-sm text-red-200 font-mono flex items-center justify-between group hover:bg-red-900/20 transition-colors mb-2">
+                                <div className="flex items-center gap-2 truncate flex-grow min-w-0 mr-2">
+                                    <GitBranch className="w-4 h-4 text-red-500 shrink-0" />
+                                    <span className="truncate">{git.url}</span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <span className="text-[10px] bg-red-900/50 px-2 py-0.5 rounded border border-red-500/30 uppercase font-bold tracking-wider">GIT LEAK</span>
+                                    {git.url && (
+                                        <a href={git.url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded bg-red-900/50 hover:bg-red-800 text-white border border-red-500/50 transition-colors" title="Clone/View">
+                                            <Download className="w-3 h-3" />
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                        {/* Backup Files */}
+                        {data.backupFiles?.length ? data.backupFiles.map((file, idx) => (
+                            <div key={idx} className="p-2 bg-red-900/10 border border-red-500/30 rounded text-sm text-red-200 font-mono flex items-center justify-between group hover:bg-red-900/20 transition-colors">
+                                <div className="flex items-center gap-2 truncate flex-grow min-w-0 mr-2">
+                                    <FileCode className="w-4 h-4 text-red-500 shrink-0" />
+                                    <span className="truncate">{file.url}</span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <span className="text-[10px] bg-red-900/50 px-2 py-0.5 rounded border border-red-500/30 uppercase font-bold tracking-wider">LEAK</span>
+                                    {file.url && (
+                                        <a href={file.url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded bg-red-900/50 hover:bg-red-800 text-white border border-red-500/50 transition-colors" title="Download">
+                                            <Download className="w-3 h-3" />
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
+                        )) : (!data.gitExposures?.length && <div className="text-slate-500 italic text-sm">No backup or source files found.</div>)}
                     </div>
                  </div>
                  <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 backdrop-blur-sm">
@@ -173,10 +213,16 @@ const ResultDashboard: React.FC<ResultDashboardProps> = ({ data }) => {
                         {data.hiddenDirectories?.length ? data.hiddenDirectories.map((dir, idx) => (<div key={idx} className="p-2 bg-slate-900/50 border border-slate-700 rounded text-sm text-yellow-300 font-mono">{dir}</div>)) : <div className="text-slate-500 italic text-sm">No hidden paths found.</div>}
                     </div>
                  </div>
-                 <div className="md:col-span-2 bg-slate-800/50 border border-slate-700 rounded-xl p-6 backdrop-blur-sm">
+                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 backdrop-blur-sm">
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><History className="text-yellow-400 w-5 h-5" /> Wayback Archive Findings</h3>
+                    <div className="max-h-64 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
+                        {data.archiveEndpoints?.length ? data.archiveEndpoints.map((path, idx) => (<div key={idx} className="p-2 bg-slate-900/50 border border-slate-700 rounded text-sm text-yellow-300 font-mono break-all">{renderFinding(path)}</div>)) : <div className="text-slate-500 italic text-sm">No interesting history found.</div>}
+                    </div>
+                 </div>
+                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 backdrop-blur-sm">
                     <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Wifi className="text-cyan-400 w-5 h-5" /> Open Ports & Services</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {data.openPorts?.length ? data.openPorts.map((port, idx) => (<div key={idx} className="p-3 bg-slate-900 border border-slate-700 rounded-lg flex flex-col items-center justify-center text-center group hover:border-red-500/50 transition-colors"><span className="text-2xl font-black text-white group-hover:text-red-400">{port.port}</span><span className="text-xs text-slate-400 uppercase font-mono">{port.service}</span><span className={`text-[10px] px-2 py-0.5 rounded-full mt-2 ${port.status === 'OPEN' ? 'bg-red-500/20 text-red-400' : 'bg-slate-700 text-slate-400'}`}>{port.status}</span></div>)) : <div className="col-span-4 text-slate-500 italic text-center">No open ports inferred.</div>}
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {data.openPorts?.length ? data.openPorts.map((port, idx) => (<div key={idx} className="p-3 bg-slate-900 border border-slate-700 rounded-lg flex flex-col items-center justify-center text-center group hover:border-red-500/50 transition-colors"><span className="text-2xl font-black text-white group-hover:text-red-400">{port.port}</span><span className="text-xs text-slate-400 uppercase font-mono">{port.service}</span><span className={`text-[10px] px-2 py-0.5 rounded-full mt-2 ${port.status === 'OPEN' ? 'bg-red-500/20 text-red-400' : 'bg-slate-700 text-slate-400'}`}>{port.status}</span></div>)) : <div className="col-span-3 text-slate-500 italic text-center">No open ports inferred.</div>}
                     </div>
                  </div>
             </div>
@@ -195,7 +241,7 @@ const ResultDashboard: React.FC<ResultDashboardProps> = ({ data }) => {
                     
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       {data.exploitVectors.map((vector, idx) => (
-                        <div key={idx} className="bg-slate-950 border border-red-500/20 rounded-lg p-4 hover:border-red-500/50 transition-all group">
+                        <div key={idx} className="bg-slate-955 border border-red-500/20 rounded-lg p-4 hover:border-red-500/50 transition-all group">
                           <div className="flex justify-between items-start mb-3">
                              <div className="flex items-center gap-2">
                                  <span className="px-2 py-1 bg-red-500/10 text-red-400 text-xs font-bold border border-red-500/20 rounded uppercase flex items-center gap-1">
@@ -394,7 +440,17 @@ const ResultDashboard: React.FC<ResultDashboardProps> = ({ data }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 backdrop-blur-sm">
                     <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><MapPin className="text-cyan-400 w-5 h-5" /> Server Geolocation</h3>
-                    {data.geolocation ? (<div className="space-y-2 text-sm"><div className="flex justify-between border-b border-slate-700 pb-2"><span className="text-slate-400">Country</span><span className="text-white font-mono">{data.geolocation.country}</span></div><div className="flex justify-between border-b border-slate-700 pb-2"><span className="text-slate-400">City</span><span className="text-white font-mono">{data.geolocation.city || 'Unknown'}</span></div><div className="flex justify-between"><span className="text-slate-400">ISP / Hoster</span><span className="text-cyan-400 font-mono">{data.geolocation.isp}</span></div></div>) : <div className="text-slate-500 italic">Geo-data unavailable.</div>}
+                    {data.geolocation ? (
+                        <div className="space-y-2 text-sm">
+                            <div className="flex justify-between border-b border-slate-700 pb-2">
+                                <span className="text-slate-400">IP Address</span>
+                                <span className="text-white font-mono font-bold">{data.targetIp || 'Unknown'}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-slate-700 pb-2"><span className="text-slate-400">Country</span><span className="text-white font-mono">{data.geolocation.country}</span></div>
+                            <div className="flex justify-between border-b border-slate-700 pb-2"><span className="text-slate-400">City</span><span className="text-white font-mono">{data.geolocation.city || 'Unknown'}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-400">ISP / Hoster</span><span className="text-cyan-400 font-mono">{data.geolocation.isp}</span></div>
+                        </div>
+                    ) : <div className="text-slate-500 italic">Geo-data unavailable.</div>}
                 </div>
                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 backdrop-blur-sm">
                     <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Calendar className="text-cyan-400 w-5 h-5" /> Whois & Registrar</h3>
@@ -417,6 +473,20 @@ const ResultDashboard: React.FC<ResultDashboardProps> = ({ data }) => {
                     <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><ShieldCheck className="text-cyan-400 w-5 h-5" /> HTTP Security Headers</h3>
                     <div className="space-y-2">{data.securityHeaders?.length ? data.securityHeaders.map((header, idx) => (<div key={idx} className="flex justify-between items-center p-2 bg-slate-900/50 rounded border border-slate-700"><span className="text-sm font-mono text-slate-300">{header.name}</span><span className={`text-xs font-bold px-2 py-0.5 rounded ${header.status === 'SECURE' ? 'bg-green-500/20 text-green-400' : header.status === 'WEAK' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>{header.status}</span></div>)) : <div className="text-slate-500 italic">No headers analyzed.</div>}</div>
                  </div>
+                 
+                 {/* SSL Info Card - Added */}
+                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 backdrop-blur-sm">
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Lock className="text-green-400 w-5 h-5" /> SSL/TLS Configuration</h3>
+                    {data.sslInfo?.validTo || data.sslInfo?.protocol ? (
+                        <div className="space-y-2 text-sm">
+                            <div className="flex justify-between border-b border-slate-700 pb-2"><span className="text-slate-400">Issuer</span><span className="text-white font-mono">{data.sslInfo.issuer || 'Unknown'}</span></div>
+                            <div className="flex justify-between border-b border-slate-700 pb-2"><span className="text-slate-400">Protocol</span><span className="text-white font-mono">{data.sslInfo.protocol || 'TLS 1.2'}</span></div>
+                            <div className="flex justify-between border-b border-slate-700 pb-2"><span className="text-slate-400">Valid Until</span><span className="text-cyan-400 font-mono">{data.sslInfo.validTo || 'Unknown'}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-400">Grade</span><span className={`font-bold ${data.sslInfo.grade === 'A' ? 'text-green-400' : data.sslInfo.grade === 'B' ? 'text-yellow-400' : 'text-red-400'}`}>{data.sslInfo.grade || 'N/A'}</span></div>
+                        </div>
+                    ) : <div className="text-slate-500 italic">No SSL info available.</div>}
+                 </div>
+
                  <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 backdrop-blur-sm">
                     <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Braces className="text-purple-400 w-5 h-5" /> API Security</h3>
                     <div className="space-y-4">
@@ -428,6 +498,30 @@ const ResultDashboard: React.FC<ResultDashboardProps> = ({ data }) => {
                                         {renderFinding(ep)}
                                     </div>
                                 )) : <span className="text-slate-500 italic text-sm">No API endpoints enumerated.</span>}
+                            </div>
+                        </div>
+                        
+                        {/* Rate Limiting - Added */}
+                        <div>
+                            <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Rate Limiting & Throttling</h4>
+                            <div className="space-y-2">
+                                {data.rateLimiting?.length ? data.rateLimiting.map((item, idx) => (
+                                    <div key={idx} className="p-2 bg-red-900/10 border border-red-500/30 rounded text-red-200 text-xs font-mono">
+                                        {renderFinding(item)}
+                                    </div>
+                                )) : <div className="text-slate-500 italic text-sm">No rate limiting issues found.</div>}
+                            </div>
+                        </div>
+
+                        {/* General API Security Findings - Added */}
+                        <div>
+                            <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">General API Flaws</h4>
+                            <div className="space-y-2">
+                                {data.apiSecurity?.length ? data.apiSecurity.map((item, idx) => (
+                                    <div key={idx} className="p-2 bg-slate-900 border border-slate-700 rounded text-slate-300 text-xs font-mono border-l-2 border-purple-500">
+                                        {renderFinding(item)}
+                                    </div>
+                                )) : <div className="text-slate-500 italic text-sm">No general API flaws detected.</div>}
                             </div>
                         </div>
                     </div>

