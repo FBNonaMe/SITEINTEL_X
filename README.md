@@ -69,7 +69,7 @@ Found a CVE? SiteIntel-X writes the code for you.
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/siteintel-x.git
+git clone https://github.com/FBNonaMe/SITEINTEL_X.git
 
 # Enter the war room
 cd siteintel-x
@@ -77,9 +77,6 @@ cd siteintel-x
 # Install dependencies
 npm install
 
-# Set your warhead (API Key)
-# Create a .env file and add:
-# API_KEY=your_gemini_api_key_here
 
 # Launch
 npm start dev 
